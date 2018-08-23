@@ -29,6 +29,8 @@ from waitress.compat import (
     )
 from . import wasyncore
 
+SD_LISTEN_FDS_START = 3
+
 def create_server(application,
                   map=None,
                   _start=True,      # test shim
@@ -69,19 +71,33 @@ def create_server(application,
 
     effective_listen = []
     last_serv = None
-    for sockinfo in adj.listen:
-        # When TcpWSGIServer is called, it registers itself in the map. This
-        # side-effect is all we need it for, so we don't store a reference to
-        # or return it to the user.
-        last_serv = TcpWSGIServer(
-            application,
-            map,
-            _start,
-            _sock,
-            dispatcher=dispatcher,
-            adj=adj,
-            sockinfo=sockinfo)
-        effective_listen.append((last_serv.effective_host, last_serv.effective_port))
+    if adj.systemd_socket:
+        for sockinfo, ufds in zip(adj.listen, range(adj.systemd_socket_count)):
+            last_serv = PreparedSocketTcpWSGIServer(
+                application,
+                SD_LISTEN_FDS_START + ufds,
+                map,
+                _start,
+                _sock,
+                dispatcher=dispatcher,
+                adj=adj,
+                sockinfo=sockinfo)
+            effective_listen.append((last_serv.effective_host, last_serv.effective_port))
+        pass
+    else:
+        for sockinfo in adj.listen:
+            # When TcpWSGIServer is called, it registers itself in the map. This
+            # side-effect is all we need it for, so we don't store a reference to
+            # or return it to the user.
+            last_serv = TcpWSGIServer(
+                application,
+                map,
+                _start,
+                _sock,
+                dispatcher=dispatcher,
+                adj=adj,
+                sockinfo=sockinfo)
+            effective_listen.append((last_serv.effective_host, last_serv.effective_port))
 
     # We are running a single server, so we can just return the last server,
     # saves us from having to create one more object
@@ -333,6 +349,42 @@ class TcpWSGIServer(BaseWSGIServer):
     def set_socket_options(self, conn):
         for (level, optname, value) in self.adj.socket_options:
             conn.setsockopt(level, optname, value)
+
+
+class PreparedSocketTcpWSGIServer(TcpWSGIServer):
+
+    prepared_fileno = None
+
+    def __init__(self,
+                 application,
+                 fileno,
+                 map=None,
+                 _start=True,      # test shim
+                 _sock=None,       # test shim
+                 dispatcher=None,  # dispatcher
+                 adj=None,         # adjustments
+                 sockinfo=None,    # opaque object
+                 **kw
+                 ):
+        self.prepared_fileno = fileno
+        super(PreparedSocketTcpWSGIServer, self).__init__(
+            application,
+            map=map,
+            _start=_start,
+            _sock=_sock,
+            dispatcher=dispatcher,
+            adj=adj,
+            sockinfo=sockinfo,
+            **kw)
+
+    def bind_server_socket(self):
+        pass
+
+    def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
+        self.family_and_type = family, type
+        sock = socket.fromfd(self.prepared_fileno, family, type)
+        sock.setblocking(0)
+        self.set_socket(sock)
 
 
 if hasattr(socket, 'AF_UNIX'):

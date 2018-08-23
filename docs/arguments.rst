@@ -51,6 +51,9 @@ unix_socket_perms
     Octal permissions to use for the Unix domain socket (string), default is
     ``600``. Only used if ``unix_socket`` is not ``None``.
 
+systemd_socket
+    Enable or disable systemd socket activation (boolean)
+
 threads
     number of threads used to process application logic (integer), default
     ``4``

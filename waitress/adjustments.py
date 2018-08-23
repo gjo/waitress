@@ -14,6 +14,7 @@
 """Adjustments are tunable parameters.
 """
 import getopt
+import os
 import socket
 
 from waitress.compat import (
@@ -106,6 +107,7 @@ class Adjustments(object):
         ('asyncore_use_poll', asbool),
         ('unix_socket', str),
         ('unix_socket_perms', asoctal),
+        ('systemd_socket', asbool),
     )
 
     _param_map = dict(_params)
@@ -196,6 +198,12 @@ class Adjustments(object):
 
     # Path to a Unix domain socket to use.
     unix_socket_perms = 0o600
+
+    # Boolean: enable systemd socket activation
+    systemd_socket = False
+
+    # Passed number of sockets from $LISTEN_FDS
+    systemd_socket_count = 0
 
     # The socket options to set on receiving a connection.  It is a list of
     # (level, optname, value) tuples.  TCP_NODELAY disables the Nagle
@@ -300,6 +308,11 @@ class Adjustments(object):
                 raise ValueError('Invalid host/port specified.')
 
         self.listen = wanted_sockets
+
+        if self.systemd_socket:
+            self.systemd_socket_count = int(os.environ.get('LISTEN_FDS'))
+            if len(self.listen) != self.systemd_socket_count:
+                raise ValueError('Unmatch number of FDs between listen and LISTEN_FDS.')
 
     @classmethod
     def parse_args(cls, argv):

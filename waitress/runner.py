@@ -92,6 +92,9 @@ Standard options:
         Octal permissions to use for the Unix domain socket, default is
         '600'.
 
+    --[no-]systemd-socket
+        Toggle on/off systemd socket activation support.
+
     --url-scheme=STR
         Default wsgi.url_scheme value, default is 'http'.
 
