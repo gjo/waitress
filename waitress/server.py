@@ -383,6 +383,12 @@ class PreparedSocketTcpWSGIServer(TcpWSGIServer):
     def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
         self.family_and_type = family, type
         sock = socket.fromfd(self.prepared_fileno, family, type)
+
+        # ``socket.fromfd`` dups argument's fd.
+        os.close(self.prepared_fileno)
+        # when drop python2 support, can use below instead of ``socket.fromfd``
+        # sock = socket.socket(fileno=self.prepared_fileno)
+
         sock.setblocking(0)
         self.set_socket(sock)
 
