@@ -84,10 +84,9 @@ def create_server(application,
                 sockinfo = (socket.AF_UNIX, socket.SOCK_STREAM, None, None)
                 last_serv = PreparedSocketUnixWSGIServer(
                     application,
-                    sock,
                     map,
                     _start,
-                    _sock,
+                    _sock=sock,
                     dispatcher=dispatcher,
                     adj=adj,
                     sockinfo=sockinfo)
@@ -96,10 +95,9 @@ def create_server(application,
                 sockinfo = (sock.family, socket.SOCK_STREAM, sock.proto, sock.getsockname())
                 last_serv = PreparedSocketTcpWSGIServer(
                     application,
-                    sock,
                     map,
                     _start,
-                    _sock,
+                    _sock=sock,
                     dispatcher=dispatcher,
                     adj=adj,
                     sockinfo=sockinfo)
@@ -375,37 +373,8 @@ class TcpWSGIServer(BaseWSGIServer):
 
 class PreparedSocketTcpWSGIServer(TcpWSGIServer):
 
-    prepared_socket = None
-
-    def __init__(self,
-                 application,
-                 sock,
-                 map=None,
-                 _start=True,      # test shim
-                 _sock=None,       # test shim
-                 dispatcher=None,  # dispatcher
-                 adj=None,         # adjustments
-                 sockinfo=None,    # opaque object
-                 **kw
-                 ):
-        self.prepared_socket = sock
-        super(PreparedSocketTcpWSGIServer, self).__init__(
-            application,
-            map=map,
-            _start=_start,
-            _sock=_sock,
-            dispatcher=dispatcher,
-            adj=adj,
-            sockinfo=sockinfo,
-            **kw)
-
     def bind_server_socket(self):
         pass
-
-    def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
-        self.family_and_type = family, type
-        self.prepared_socket.setblocking(0)
-        self.set_socket(self.prepared_socket)
 
 
 if hasattr(socket, 'AF_UNIX'):
@@ -449,38 +418,11 @@ if hasattr(socket, 'AF_UNIX'):
         def get_server_name(self, ip):
             return 'localhost'
 
+
     class PreparedSocketUnixWSGIServer(UnixWSGIServer):
-
-        prepared_socket = None
-
-        def __init__(self,
-                     application,
-                     sock,
-                     map=None,
-                     _start=True,      # test shim
-                     _sock=None,       # test shim
-                     dispatcher=None,  # dispatcher
-                     adj=None,         # adjustments
-                     sockinfo=None,    # opaque object
-                     **kw):
-            self.prepared_socket = sock
-            super(PreparedSocketUnixWSGIServer, self).__init__(
-                application,
-                map=map,
-                _start=_start,
-                _sock=_sock,
-                dispatcher=dispatcher,
-                adj=adj,
-                sockinfo=sockinfo,
-                **kw)
 
         def bind_server_socket(self):
             pass
-
-        def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
-            self.family_and_type = family, type
-            self.prepared_socket.setblocking(0)
-            self.set_socket(self.prepared_socket)
 
 
 # Compatibility alias.

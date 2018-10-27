@@ -229,6 +229,10 @@ class TestAdjustments(unittest.TestCase):
         inst = self._makeOne(ident='specific_header')
         self.assertEqual(inst.ident, 'specific_header')
 
+    def test_systemd_socket_enabled(self):
+        if PY2:  # pragma: no cover
+            self.assertRaises(ValueError, self._makeOne, systemd_socket='true')
+
 
 class TestCLI(unittest.TestCase):
 

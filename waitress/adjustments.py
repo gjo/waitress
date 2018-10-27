@@ -14,7 +14,6 @@
 """Adjustments are tunable parameters.
 """
 import getopt
-import os
 import socket
 
 from waitress.compat import (

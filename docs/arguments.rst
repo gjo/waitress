@@ -54,6 +54,8 @@ unix_socket_perms
 systemd_socket
     Enable or disable systemd socket activation (boolean)
 
+    Not available on Python2.
+
 threads
     number of threads used to process application logic (integer), default
     ``4``
