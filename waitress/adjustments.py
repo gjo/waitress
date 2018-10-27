@@ -202,9 +202,6 @@ class Adjustments(object):
     # Boolean: enable systemd socket activation
     systemd_socket = False
 
-    # Passed number of sockets from $LISTEN_FDS
-    systemd_socket_count = 0
-
     # The socket options to set on receiving a connection.  It is a list of
     # (level, optname, value) tuples.  TCP_NODELAY disables the Nagle
     # algorithm for writes (Waitress already buffers its writes).
@@ -309,10 +306,8 @@ class Adjustments(object):
 
         self.listen = wanted_sockets
 
-        if self.systemd_socket:
-            self.systemd_socket_count = int(os.environ.get('LISTEN_FDS'))
-            if len(self.listen) != self.systemd_socket_count:
-                raise ValueError('Unmatch number of FDs between listen and LISTEN_FDS.')
+        if self.systemd_socket and PY2:
+            raise ValueError('Python2 does not support to create sockets via fileno')
 
     @classmethod
     def parse_args(cls, argv):

@@ -72,18 +72,40 @@ def create_server(application,
     effective_listen = []
     last_serv = None
     if adj.systemd_socket:
-        for sockinfo, ufds in zip(adj.listen, range(adj.systemd_socket_count)):
-            last_serv = PreparedSocketTcpWSGIServer(
-                application,
-                SD_LISTEN_FDS_START + ufds,
-                map,
-                _start,
-                _sock,
-                dispatcher=dispatcher,
-                adj=adj,
-                sockinfo=sockinfo)
-            effective_listen.append((last_serv.effective_host, last_serv.effective_port))
-        pass
+        nfds = int(os.environ.get('LISTEN_FDS'))
+        for fd_offset in range(nfds):
+            fd = SD_LISTEN_FDS_START + fd_offset
+            sock = socket.socket(fileno=fd)
+
+            if sock.type != socket.SOCK_STREAM:
+                raise ValueError('Unsupported socket type')
+
+            if hasattr(socket, 'AF_UNIX') and sock.family == socket.AF_UNIX:
+                sockinfo = (socket.AF_UNIX, socket.SOCK_STREAM, None, None)
+                last_serv = PreparedSocketUnixWSGIServer(
+                    application,
+                    sock,
+                    map,
+                    _start,
+                    _sock,
+                    dispatcher=dispatcher,
+                    adj=adj,
+                    sockinfo=sockinfo)
+                effective_listen.append((last_serv.effective_host, last_serv.effective_port))
+            elif sock.family in (socket.AF_INET, socket.AF_INET6):
+                sockinfo = (sock.family, socket.SOCK_STREAM, sock.proto, sock.getsockname())
+                last_serv = PreparedSocketTcpWSGIServer(
+                    application,
+                    sock,
+                    map,
+                    _start,
+                    _sock,
+                    dispatcher=dispatcher,
+                    adj=adj,
+                    sockinfo=sockinfo)
+                effective_listen.append((last_serv.effective_host, last_serv.effective_port))
+            else:
+                raise ValueError('Unsupported Address Family')
     else:
         for sockinfo in adj.listen:
             # When TcpWSGIServer is called, it registers itself in the map. This
@@ -101,7 +123,7 @@ def create_server(application,
 
     # We are running a single server, so we can just return the last server,
     # saves us from having to create one more object
-    if len(adj.listen) == 1:
+    if len(effective_listen) == 1:
         # In this case we have no need to use a MultiSocketServer
         return last_serv
 
@@ -353,11 +375,11 @@ class TcpWSGIServer(BaseWSGIServer):
 
 class PreparedSocketTcpWSGIServer(TcpWSGIServer):
 
-    prepared_fileno = None
+    prepared_socket = None
 
     def __init__(self,
                  application,
-                 fileno,
+                 sock,
                  map=None,
                  _start=True,      # test shim
                  _sock=None,       # test shim
@@ -366,7 +388,7 @@ class PreparedSocketTcpWSGIServer(TcpWSGIServer):
                  sockinfo=None,    # opaque object
                  **kw
                  ):
-        self.prepared_fileno = fileno
+        self.prepared_socket = sock
         super(PreparedSocketTcpWSGIServer, self).__init__(
             application,
             map=map,
@@ -382,15 +404,8 @@ class PreparedSocketTcpWSGIServer(TcpWSGIServer):
 
     def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
         self.family_and_type = family, type
-        sock = socket.fromfd(self.prepared_fileno, family, type)
-
-        # ``socket.fromfd`` dups argument's fd.
-        os.close(self.prepared_fileno)
-        # when drop python2 support, can use below instead of ``socket.fromfd``
-        # sock = socket.socket(fileno=self.prepared_fileno)
-
-        sock.setblocking(0)
-        self.set_socket(sock)
+        self.prepared_socket.setblocking(0)
+        self.set_socket(self.prepared_socket)
 
 
 if hasattr(socket, 'AF_UNIX'):
@@ -433,6 +448,40 @@ if hasattr(socket, 'AF_UNIX'):
 
         def get_server_name(self, ip):
             return 'localhost'
+
+    class PreparedSocketUnixWSGIServer(UnixWSGIServer):
+
+        prepared_socket = None
+
+        def __init__(self,
+                     application,
+                     sock,
+                     map=None,
+                     _start=True,      # test shim
+                     _sock=None,       # test shim
+                     dispatcher=None,  # dispatcher
+                     adj=None,         # adjustments
+                     sockinfo=None,    # opaque object
+                     **kw):
+            self.prepared_socket = sock
+            super(PreparedSocketUnixWSGIServer, self).__init__(
+                application,
+                map=map,
+                _start=_start,
+                _sock=_sock,
+                dispatcher=dispatcher,
+                adj=adj,
+                sockinfo=sockinfo,
+                **kw)
+
+        def bind_server_socket(self):
+            pass
+
+        def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
+            self.family_and_type = family, type
+            self.prepared_socket.setblocking(0)
+            self.set_socket(self.prepared_socket)
+
 
 # Compatibility alias.
 WSGIServer = TcpWSGIServer
