@@ -121,6 +121,12 @@ class TestFileBasedBuffer(unittest.TestCase):
         self.assertTrue(f.closed)
         self.buffers_to_close.remove(inst)
 
+    def test_closed_file(self):
+        f = io.BytesIO()
+        inst = self._makeOne(f)
+        f.close()
+        self.assertRaises(ValueError, inst.append, b'd')
+
 class TestTempfileBasedBuffer(unittest.TestCase):
 
     def _makeOne(self, from_buffer=None):
