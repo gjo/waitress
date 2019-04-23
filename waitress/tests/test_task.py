@@ -396,6 +396,18 @@ class TestWSGITask(unittest.TestCase):
         self.assertTrue(inst.close_on_finish)
         self.assertFalse(inst.channel.written)
 
+    def test_service_server_raises_value_error(self):
+        inst = self._makeOne()
+        def execute():
+            raise ValueError
+        inst.execute = execute
+        self.assertRaises(ValueError, inst.service)
+        # inst.channel.adj.log_socket_errors = False
+        # inst.service()
+        self.assertTrue(inst.start_time)
+        # self.assertTrue(inst.close_on_finish)
+        self.assertFalse(inst.channel.written)
+
     def test_execute_app_calls_start_response_twice_wo_exc_info(self):
         def app(environ, start_response):
             start_response('200 OK', [])
@@ -506,6 +518,17 @@ class TestWSGITask(unittest.TestCase):
         inst.channel.server.application = app
         inst.execute()
         self.assertEqual(inst.content_length, 1)
+
+    def test_execute_server_raises_value_error(self):
+        def app(environ, start_response):
+            start_response('200 OK', [('Content-Length', '1')])
+            return [b'a']
+        def write_soon(*args, **kwargs):
+            raise ValueError
+        inst = self._makeOne()
+        inst.channel.server.application = app
+        inst.channel.write_soon = write_soon
+        self.assertRaises(ValueError, inst.execute)
 
     def test_execute_app_calls_write(self):
         def app(environ, start_response):

@@ -236,6 +236,13 @@ class TestHTTPChannel(unittest.TestCase):
         inst._flush_outbufs_below_high_watermark = dummy_flush
         self.assertRaises(ClientDisconnected, lambda: inst.write_soon(b'stuff'))
 
+    def test_write_soon_colosed(self):
+        inst, sock, map = self._makeOneWithMap()
+        def dummy_append(*args, **kwargs):
+            raise ValueError
+        inst.outbufs[-1].append = dummy_append
+        self.assertRaises(ValueError, lambda: inst.write_soon(b'stuff'))
+
     def test_write_soon_rotates_outbuf_on_overflow(self):
         inst, sock, map = self._makeOneWithMap()
         inst.adj.outbuf_high_watermark = 3
