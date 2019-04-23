@@ -21,6 +21,9 @@ COPY_BYTES = 1 << 18 # 256K
 # The maximum number of bytes to buffer in a simple string.
 STRBUF_LIMIT = 8192
 
+class FileClosed(Exception):
+    """ Raised when attempting to write to a closed file."""
+
 class FileBasedBuffer(object):
 
     remain = 0
@@ -50,7 +53,11 @@ class FileBasedBuffer(object):
 
     def append(self, s):
         file = self.file
-        read_pos = file.tell()
+        # client socket is closed. (ref: #116)
+        try:
+            read_pos = file.tell()
+        except ValueError:
+            raise FileClosed
         file.seek(0, 2)
         file.write(s)
         file.seek(read_pos)

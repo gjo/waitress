@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 
-from .buffers import ReadOnlyFileBasedBuffer
+from .buffers import FileClosed, ReadOnlyFileBasedBuffer
 from .compat import reraise, tobytes
 from .utilities import (
     Forwarded,
@@ -175,7 +175,7 @@ class Task(object):
                 self.start()
                 self.execute()
                 self.finish()
-            except socket.error:
+            except (socket.error, FileClosed):
                 self.close_on_finish = True
                 if self.channel.adj.log_socket_errors:
                     raise

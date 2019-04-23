@@ -237,11 +237,12 @@ class TestHTTPChannel(unittest.TestCase):
         self.assertRaises(ClientDisconnected, lambda: inst.write_soon(b'stuff'))
 
     def test_write_soon_colosed(self):
+        from waitress.buffers import FileClosed
         inst, sock, map = self._makeOneWithMap()
         def dummy_append(*args, **kwargs):
-            raise ValueError
+            raise FileClosed
         inst.outbufs[-1].append = dummy_append
-        self.assertRaises(ValueError, lambda: inst.write_soon(b'stuff'))
+        self.assertRaises(FileClosed, lambda: inst.write_soon(b'stuff'))
 
     def test_write_soon_rotates_outbuf_on_overflow(self):
         inst, sock, map = self._makeOneWithMap()
